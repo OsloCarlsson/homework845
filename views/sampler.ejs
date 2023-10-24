@@ -1,0 +1,380 @@
+<style>
+    
+    
+    .container {
+        margin-top: 80px;
+        margin-bottom: 0px;
+        display: flex;
+        align-items: center;
+    }
+
+    .samplerPads {
+        height: 220px;
+        margin: 0 auto;
+        width: 400px;
+        border: 1px solid black;
+        flex: none;
+        background-color: #2a2a2a; /* Dark background for contrast */
+        padding: 15px;  /* Add some spacing */
+    }
+    
+    .padGrid {
+      align-items: center;
+      display: flex;
+      flex-flow: wrap;
+      justify-content: space-around;  
+    }
+    
+    .padGrid-pad {
+      background: rgb(20, 20, 20); /* Dark gray for the pad */
+      border: 2px solid #555; /* Slight border to give definition */
+      height: 90px;
+      width: 90px;
+      border-radius: 10%; /* Slightly rounded corners */
+      box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5); /* Shadow for depth */
+      margin: 10px; /* Space between pads */
+      transition: background-color 0.2s, transform 0.1s; /* Smooth lighting and press effect */
+    }
+
+    .padGrid-pad:hover {
+      background-color: #555; /* Lighter color when hovered to simulate backlight */
+    }
+
+    .padGrid-pad:active {
+      transform: translateY(4px); /* Pressed down effect */
+      box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.5); /* Reduce shadow when pressed */
+    }
+    
+    .padname {
+        color: rgb(255, 255, 255); /* White text for better visibility */
+        font-size: 10px;
+        font-weight: bold;
+        text-align: center;
+        width: 120px;
+        height: 80px;
+        margin-bottom: 5px; /* Some spacing between the name and the pad */
+    }
+
+    @media only screen and (orientation: landscape) {
+      .samplerPads {
+        height: 245px;
+        width: 365px;
+      }
+    }
+
+
+</style>
+    
+    
+    
+    
+    <div class="container">
+    <div class="samplerPads">
+        <div class="padGrid">
+            <div class="padname">
+                <a>kick</a>
+            <button class="padGrid-pad" type="button"></button> 
+            </div>
+            <div class="padname">
+                <a>clap</a>
+            <button class="padGrid-pad" type="button"></button>
+        </div>
+            <div class="padname">
+                <a>hihat</a>
+            <button class="padGrid-pad" type="button"></button>
+        </div>
+            <div class="padname">
+                <a>hihat</a>
+            <button class="padGrid-pad" type="button"></button>
+        </div>
+            <div class="padname">
+                <a>snare</a>
+            <button class="padGrid-pad" type="button"></button>
+        </div>
+            <div class="padname">
+                <a>rim</a>
+            <button class="padGrid-pad" type="button"></button>
+        </div>
+            <div class="padname">
+                <a>hit</a>
+            <button class="padGrid-pad" type="button"></button>
+        </div>
+            <div class="padname">
+                <a>808</a>
+            <button class="padGrid-pad" type="button"></button>
+        </div>
+            <div class="padname">
+                <a>plong</a>
+            <button class="padGrid-pad" type="button"></button>
+            </div>
+        </div>
+        </div>
+    </div>
+    <aside>
+        <form class="controlset" id="master_controls">
+            <label for="master">Master gain:</label>
+            <input type="range" id="master" min="0" max="1" value="0.7" step="0.1">
+        </form>
+    </aside>
+    
+    
+    
+    <script>
+    
+    
+    (function() {
+          document.addEventListener('DOMContentLoaded', init, false);
+    
+          function init() {
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioContext = new AudioContext();
+    
+            const filenames = {
+              'kick': './audio/kick.wav',
+              'snare': './audio/clap.wav',
+              'closed-hat': './audio/hihat.wav',
+              'ride': './audio/hahit.wav',
+              'crash': './audio/snare.wav',
+              'open-hat': './audio/plopp.wav',
+              'high-tom': './audio/hit.wav',
+              'mid-tom': './audio/808.wav',
+              'low-tom': './audio/plonglpng.wav',
+            };
+    
+            const muteGroups = {
+              'hihat': ['closed-hat', 'open-hat'],
+            };
+    
+            Sampler.init(audioContext, filenames, muteGroups);
+    
+            document.addEventListener('keydown', function(event) {
+              const keyToPadMap = {
+                'i': 'kick',
+                'o': 'snare',
+                'p': 'closed-hat',
+                'å': 'ride',
+                'k': 'crash',
+                'l': 'open-hat',
+                'ø': 'high-tom',
+                'æ': 'mid-tom',
+                'm': 'low-tom',
+              };
+    
+              const padName = keyToPadMap[event.key];
+              if (padName) {
+                const pad = Sampler.pads[padName];
+                if (pad) {
+                  pad.playSample();
+                }
+              }
+            });
+          }
+    
+          var Sampler = {
+            init: function(context, filenames, muteGroups) {
+              this.output = context.createGain();
+              this.output.connect(audioContext.destination);
+              this.pads = {};
+              this.screenPads = document.querySelectorAll('.padGrid-pad');
+              let i = 0;
+              for (let name in filenames) {
+                let pad = Object.create(SamplePad);
+                pad.setup(context, name, filenames[name]);
+                pad.connect(this.output);
+                pad.addTarget(this.screenPads[i]);
+                this.screenPads[i].samplerPad = pad;
+                this.pads[name] = pad;
+                i++;
+              }
+              this.muteGroups = {};
+              for (let groupName in muteGroups) {
+                this.createMuteGroup(groupName, muteGroups[groupName]);
+              }
+              var masterSlider = Object.create(GainSlider);
+              masterSlider.connect(document.querySelector('#master'), this.output.gain);
+            },
+            createMuteGroup: function(name, padNames) {
+              let pads = {};
+              for (let padName of padNames) {
+                pads[padName] = this.pads[padName];
+              }
+              let muteGroup = Object.create(MuteGroup);
+              muteGroup.create(pads, name);
+              if (name in this.muteGroups) {
+                this.muteGroups[name].destroy();
+              }
+              this.muteGroups[name] = muteGroup;
+            },
+            deleteMuteGroup: function(name) {
+              this.muteGroups[name].destroy();
+              delete this.muteGroups[name];
+            },
+            disableMuteGroup: function(name) {
+              this.muteGroups[name].disable();
+            },
+            enableMuteGroup: function(name) {
+              this.muteGroups[name].enable();
+            },
+            triggerPads: function(clickEvent) {
+              for (let pad of Object.values(clickEvent.target.samplerPads)) {
+                pad.playSample();
+              }
+            },
+          };
+    
+          var SamplePad = {
+            setup: function(audioContext, name, filename) {
+              this.context = audioContext;
+              this.name = name;
+              this.muteGroups = {};
+              this.targets = {};
+              this.createSignalPath();
+              this.loadSample(filename);
+            },
+            createSignalPath: function() {
+              this.muteGain = this.context.createGain();
+              this.gain = this.context.createGain();
+              this.send = this.context.createGain();
+    
+              this.muteGain.connect(this.gain);
+              this.gain.connect(this.send);
+            },
+            loadSample: function(filename) {
+              var receiveAudio = function(request) {
+                if (request.readyState === 4 && request.status === 200) {
+                  const audioData = request.response;
+                  var successFunction = function(buffer) { this.buffer = buffer; };
+                  var errorFunction = function(e) { "Error decoding audio file." + e.err; };
+    
+                  request.removeEventListener('readystatechange', receiveAudio, false);
+                  this.context.decodeAudioData(audioData, successFunction.bind(this), errorFunction);
+                }
+              };
+              const request = new XMLHttpRequest();
+              request.open('GET', filename, true);
+              request.responseType = 'arraybuffer';
+              request.addEventListener('readystatechange', receiveAudio.bind(this, request), false);
+              request.send();
+            },
+            playSample: function() {
+              if (this.buffer) {
+                const source = this.context.createBufferSource();
+                source.buffer = this.buffer;
+                source.connect(this.muteGain);
+                this.unMute();
+                this.triggerMuteGroups();
+                source.start();
+              }
+            },
+            mute: function() {
+              this.muteGain.gain.value = 0;
+            },
+            unMute: function() {
+              this.muteGain.gain.value = 1;
+            },
+            connect: function(destination) {
+              this.gain.connect(destination);
+            },
+            connectSend: function(destination) {
+              this.send.connect(destination);
+            },
+            addMuteGroup: function(group) {
+              this.muteGroups[group.name] = group;
+            },
+            removeMuteGroup: function(group) {
+              delete this.muteGroups[group.name];
+            },
+            triggerMuteGroups: function() {
+              for (let groupName in this.muteGroups) {
+                this.muteGroups[groupName].trigger(this);
+              }
+            },
+            addTarget: function(target) {
+              this.targets[target.name] = target;
+              if (!('samplerPads' in target)) {
+                target.samplerPads = {};
+                target.addEventListener('click', Sampler.triggerPads, false);
+              }
+              target.samplerPads[this.name] = this;
+            },
+            removeTarget: function(target) {
+              delete this.targets[target.name];
+              delete target.samplerPads[this.name];
+              if (Object.keys(target.samplerPads).length === 0) {
+                delete target.samplerPads;
+                target.removeEventListener('click', Sampler.triggerPads, false);
+              }
+            },
+            clearTargets: function() {
+              for (let target in this.targets) {
+                this.removeTarget(target);
+              }
+            },
+            setTarget: function(target) {
+              this.clearTargets();
+              this.addTarget(target);
+            },
+          };
+    
+          var MuteGroup = {
+            create: function(pads, name) {
+              this.pads = pads;
+              this.name = name;
+              for (let padName in pads) {
+                pads[padName].addMuteGroup(this);
+              }
+              this.active = true;
+            },
+            destroy: function() {
+              for (let name in this.pads) {
+                this.pads[name].removeMuteGroup(this);
+              }
+              this.active = false;
+            },
+            disable: function() {
+              this.active = false;
+            },
+            enable: function() {
+              this.active = true;
+            },
+            trigger: function(playing) {
+              if (this.active) {
+                for (let name in this.pads) {
+                  if (this.pads[name] !== playing) {
+                    this.pads[name].mute();
+                  }
+                }
+              }
+            },
+          };
+    
+          var GainSlider = {
+            input: null,
+            connect: function(input, target) {
+              this.setTarget(target);
+              this.setInput(input);
+            },
+            setTarget: function(gain) {
+              this.target = gain;
+            },
+            setInput: function(input) {
+              if (this.input) {
+                this.input.removeEventListener('input', this.handleInput.bind(this), false);
+              }
+              this.input = input;
+              this.input.addEventListener('input', this.handleInput.bind(this), false);
+            },
+            handleInput: function(inputEvent) {
+              if (inputEvent.target.value > 1) {
+                this.target.value = 1;
+              } else if (inputEvent.target.value < -1) {
+                this.target.value = -1;
+              } else {
+                this.target.value = inputEvent.target.value;
+              }
+            },
+          };
+        })();
+    
+    
+    </script>
