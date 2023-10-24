@@ -1,0 +1,324 @@
+
+
+<style>
+
+    .button-container {
+        display: none;
+        flex-wrap: wrap;
+        margin-right: -4px;
+        margin-bottom: -4px;
+    }
+
+    .button {
+        flex: 1 0 100px;
+        height: 20px;
+        width: 10px;
+        margin: 2px;
+        background-color: white;
+        border: 1px solid black;
+        border-radius: 5px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        color: transparent;
+    }
+
+    .blbutton {
+        flex: 0 0 70px;
+        height: 20px;
+        width: 10px;
+        margin: 2px;
+        background-color: black;
+        color: transparent;
+        border: 1px solid black;
+        border-radius: 5px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 18px;
+        position: relative;
+        top: -33px;
+        left: 45px;
+    }
+
+    .controls {
+        display: none;
+        flex-direction: column;
+        margin-left: 20px;
+    }
+
+
+#synthvisualizer {
+  width: 400px;
+  height: 400px;
+  background-color: transparent;
+  border-radius: 50%;
+  border: 1px solid black;
+}
+
+
+
+
+
+
+</style>
+
+
+<div>
+    Play synth with keyboard keys A, W, S, E, D, F, T, G, Y, H, U, J
+</div>
+
+
+
+<div class="container">
+<div>
+  <div class="button-container">
+   
+    <button class="button" onmousedown="playSynth(261.63)" onmouseup="stopSynth()" alt="C"></button>
+    <button class="blbutton" onmousedown="playSynth(277.18)" onmouseup="stopSynth()" alt="C#/Db"></button>
+    <button class="button" onmousedown="playSynth(293.66)" onmouseup="stopSynth()" alt="D"></button>
+    <button class="blbutton" onmousedown="playSynth(311.13)" onmouseup="stopSynth()" alt="D#/Eb"></button>
+    <button class="button" onmousedown="playSynth(329.63)" onmouseup="stopSynth()" alt="E"></button>
+    <button class="button" onmousedown="playSynth(349.23)" onmouseup="stopSynth()" alt="F"></button>
+    <button class="blbutton" onmousedown="playSynth(369.99)" onmouseup="stopSynth()" alt="F#/Gb"></button>
+    <button class="button" onmousedown="playSynth(392.00)" onmouseup="stopSynth()" alt="G"></button>
+    <button class="blbutton" onmousedown="playSynth(415.30)" onmouseup="stopSynth()" alt="G#/Ab"></button>
+    <button class="button" onmousedown="playSynth(440.00)" onmouseup="stopSynth()" alt="A"></button>
+    <button class="blbutton" onmousedown="playSynth(466.16)" onmouseup="stopSynth()" alt="A#/Bb"></button>
+    <button class="button" onmousedown="playSynth(493.88)" onmouseup="stopSynth()" alt="B"></button>
+  </div>
+</div>
+  <div class="container">
+  <canvas id="synthvisualizer"></canvas>
+</div>
+  <div class="container">
+  <div class="dropdown">
+    <label for="oscillatorType">Oscillator Type:</label>
+    <select id="oscillatorType" onchange="changeOscillatorType()">
+      <option value="sine">Sine</option>
+      <option value="square">Square</option>
+      <option value="sawtooth">Sawtooth</option>
+      <option value="triangle">Triangle</option>
+    </select>
+  </div>
+
+  <div class="controls">
+    <div class="dropdown">
+        <label for="filterType">Filter Type:</label>
+        <select id="filterType" onchange="changeFilterType()">
+        <option value="lowpass">Lowpass</option>
+        <option value="highpass">Highpass</option>
+        <option value="bandpass">Bandpass</option>
+        <option value="lowshelf">Lowshelf</option>
+        <option value="highshelf">Highshelf</option>
+        <option value="peaking">Peaking</option>
+        <option value="notch">Notch</option>
+        <option value="allpass">Allpass</option>
+        </select>
+    </div>
+</div>
+  
+  
+  <div class="controls">
+    <label for="volume-control">Master Volume</label><br>
+    <input type="range" id="volume-control" max="1" min="0" value="0.2" step="0.05"><br>
+    <label for="vibrato-amount-control">Vibrato Amount</label><br>
+    <input type="range" id="vibrato-amount-control" max="1" min="0" value="0.5" step="0.05"><br>
+    <label for="vibrato-speed-control">Vibrato Speed</label><br>
+    <input type="range" id="vibrato-speed-control" max="30" min="1" value="10" step="2"><br>
+  </div>
+  </div>
+</div>
+
+
+
+<script>
+  
+  var context = new (window.AudioContext || window.webkitAudioContext)();
+    var oscillator;
+    var filter;
+    var isPlaying = false;
+    var currentOscillatorType = 'sine';
+    var currentFilterType = 'notch';
+    const masterVolume = context.createGain();
+    masterVolume.gain.setValueAtTime(0.2, 0);
+    masterVolume.connect(context.destination);
+
+    // Vibrato effect variables
+    const vibratoLFO = context.createOscillator();
+    const vibratoGain = context.createGain();
+    vibratoLFO.connect(vibratoGain);
+    vibratoLFO.start();
+    vibratoLFO.stop(context.currentTime + 1);
+
+
+    const volumeControl = document.querySelector('#volume-control');
+
+    const vibratoAmountControl = document.querySelector('#vibrato-amount-control');
+    const vibratoSpeedControl = document.querySelector('#vibrato-speed-control');
+
+    let vibratoAmount = 0.5;
+    let vibratoSpeed = 1;
+
+    vibratoAmountControl.addEventListener('input', function () {
+      vibratoAmount = this.value;
+      updateVibrato();
+    });
+
+    vibratoSpeedControl.addEventListener('input', function () {
+      vibratoSpeed = this.value;
+      updateVibrato();
+    });
+
+    function updateVibrato() {
+      vibratoGain.gain.setValueAtTime(vibratoAmount * 50, 0);
+      vibratoLFO.frequency.setValueAtTime(vibratoSpeed, 0);
+    }
+
+    // Analyser node to extract audio data
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    // Function to draw the synth visualizer
+    function synthVisualizer() {
+      requestAnimationFrame(synthVisualizer);
+
+      // Clear the canvas
+      const canvas = document.getElementById('synthvisualizer');
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Get the audio data from the analyser
+      analyser.getByteTimeDomainData(dataArray);
+
+      // Set line style
+      context.lineWidth = 1;
+      context.strokeStyle = '#000';
+
+      // Draw the waveform
+      context.beginPath();
+      const sliceWidth = canvas.width * 1.0 / bufferLength;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * canvas.height) / 2;
+
+        if (i === 0) {
+          context.moveTo(x, y);
+        } else {
+          context.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+      }
+      context.lineTo(canvas.width, canvas.height / 2);
+      context.stroke();
+    }
+
+    function playSynth(frequency) {
+      if (isPlaying) {
+        return;
+      }
+
+      oscillator = context.createOscillator();
+      oscillator.type = currentOscillatorType;
+
+      // Connect the oscillator to vibrato effect and master volume
+      oscillator.connect(vibratoGain);
+      vibratoGain.connect(masterVolume);
+
+      filter = context.createBiquadFilter();
+      filter.type = currentFilterType;
+      filter.frequency.value = 1000;
+      filter.Q.value = 10;
+
+      oscillator.connect(filter);
+      filter.connect(analyser);
+      analyser.connect(context.destination);
+
+      oscillator.frequency.setValueAtTime(frequency, context.currentTime);
+      oscillator.start();
+      isPlaying = true;
+
+      // Start drawing the synth visualizer
+      synthVisualizer();
+    }
+
+    function stopSynth() {
+      if (!isPlaying) {
+        return;
+      }
+
+      oscillator.stop();
+      oscillator.disconnect();
+      filter.disconnect();
+      isPlaying = false;
+    }
+
+    function changeOscillatorType() {
+      currentOscillatorType = document.getElementById('oscillatorType').value;
+      if (isPlaying) {
+        stopSynth();
+        playSynth(oscillator.frequency.value);
+      }
+    }
+
+    function changeFilterType() {
+      currentFilterType = document.getElementById('filterType').value;
+      if (isPlaying) {
+        stopSynth();
+        playSynth(oscillator.frequency.value);
+      }
+    }
+
+    // Map keyboard keys to corresponding piano button indexes
+    const keyToButtonMap = {
+      KeyA: 0, // C
+      KeyW: 1, // C#/Db
+      KeyS: 2, // D
+      KeyE: 3, // D#/Eb
+      KeyD: 4, // E
+      KeyF: 5, // F
+      KeyT: 6, // F#/Gb
+      KeyG: 7, // G
+      KeyY: 8, // G#/Ab
+      KeyH: 9, // A
+      KeyU: 10, // A#/Bb
+      KeyJ: 11, // B
+    };
+
+    // Add event listener to capture keyboard keydown events
+    window.addEventListener('keydown', function (event) {
+      const key = event.code;
+      if (keyToButtonMap.hasOwnProperty(key)) {
+        const buttonIndex = keyToButtonMap[key];
+        const frequency = getFrequencyForButton(buttonIndex);
+        playSynth(frequency);
+      }
+    });
+
+    // Add event listener to capture keyboard keyup events
+    window.addEventListener('keyup', function (event) {
+      const key = event.code;
+      if (keyToButtonMap.hasOwnProperty(key)) {
+        stopSynth();
+      }
+    });
+
+    // Function to retrieve the frequency for a given button index
+    function getFrequencyForButton(buttonIndex) {
+      const frequencies = [
+        261.63, 277.18, 293.66, 311.13, 329.63, 349.23,
+        369.99, 392.00, 415.30, 440.00, 466.16, 493.88
+      ];
+      return frequencies[buttonIndex];
+    }
+
+    updateVibrato();
+
+</script>
+
